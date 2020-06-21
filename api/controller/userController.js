@@ -2,6 +2,10 @@ const {createAccount} = require('../utils/create_user');
 const {validateEmail} = require('../utils/mail_validator');
 const {generateId, generateToken} = require('../utils/generate_string');
 const bcryptjs = require('bcryptjs');
+const axios = require('axios').default;
+
+const express = require('express')
+const app = express();
  
 //const {getConnection} = require('../utils/db_connector');
 //const connection = getConnection();
@@ -11,7 +15,7 @@ const DB = new Database();
 //const debug = require('debug')('app:userController');
  
 exports.createUser = async (req,res,next) => {
-    const {name, email, password, organisation} = req.body;
+    const {name, email, password, organisation} = req.body; //add password column in DB
     if (!name || !email || !password || !organisation) {
         res.status(400).send({
           status: 'failed',
@@ -126,6 +130,25 @@ exports.loginUser = async (req, res, next) => {
     try {
         let rows = await DB.query(sql, [email]);
         if ( rows.length > 0 ) {
+            let body = rows[0];
+            if ( body.disabled == 1 ) { // CHECK IF ACCOUNT IS DISABLED
+                await sendMail(
+                    body.name,
+                    body.email,
+                    "MicroApi-Email Team",
+                    "hello@microapiemail.ng",
+                    "Your account had been disabled",
+                    "Click here to enable your account",
+                    body.account_id,
+                    body.access_token
+                )
+                return res.status(400).send({
+                    status: 'failed',
+                    data: {
+                        message: "Maximum number of login attempts exceeded; your account has been disabled temporally. Check your email to enable account."
+                    }
+                })
+            }
             let valid = await bcryptjs.compare(password, rows[0].password);
             if ( valid ) {
                 return res.status(200).send({
@@ -141,10 +164,38 @@ exports.loginUser = async (req, res, next) => {
                     }
                 })
             } else {
+                // CHECK HOW MANY TIMES USER ATTEMPTED LOGIN
+                let max_attempt = 5;
+                let sql = " SELECT `invalid_login_count` FROM users WHERE `email` = ? ";
+                let count = await DB.query(sql, [email]);
+                let login_counts = count[0].invalid_login_count;
+                if ( count[0].invalid_login_count == (max_attempt - 1) ) {
+                    await sendMail(
+                        body.name,
+                        body.email,
+                        "MicroApi-Email Team",
+                        "hello@microapiemail.ng",
+                        "Your account had been disabled",
+                        "Click here to enable your account",
+                        body.account_id,
+                        body.access_token
+                    )
+                    let sql = ` UPDATE users SET invalid_login_count = ${login_counts + 1}, disabled = 1 WHERE email = ?`;
+                    await DB.query(sql, [email]);
+                    return res.status(400).send({
+                        status: 'failed',
+                        data: {
+                            message: "Maximum number of login attempts exceeded; your account has been disabled temporally. Check your email to enable account."
+                        }
+                    })
+                } else {
+                    let sql = ` UPDATE users SET invalid_login_count = ${login_counts + 1} WHERE email = ?`;
+                    await DB.query(sql, [email]);
+                }
                 return res.status(403).send({
                     status: 'failed',
                     data: {
-                        message: "Incorrect username or password, please review details and try again"
+                        message: "Incorrect email or password, please review details and try again"
                     }
                 })
             }
@@ -152,7 +203,7 @@ exports.loginUser = async (req, res, next) => {
             return res.status(400).send({
                 status: 'failed',
                 data: {
-                    message: 'Incorrect username or password, please review details and try again'
+                    message: 'Incorrect email or password, please review details and try again'
                 }
             })
         }
@@ -160,4 +211,19 @@ exports.loginUser = async (req, res, next) => {
         console.log(err)
     }
     
+}
+
+async function sendMail (recipient_name, recipient_email, sender_name, sender_email, subject, body, account_id, access_token){
+    let pload = {
+        recipient_name,
+        recipient_email,
+        sender_name,
+        sender_email,
+        subject,
+        body,
+        account_id,
+        access_token,
+    }
+
+    // SEND EMAIL HERE
 }
