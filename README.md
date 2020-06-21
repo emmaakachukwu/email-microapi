@@ -46,9 +46,13 @@ include email, name, organistion in the body of the request message. e.g
 
 
 # Installation Using Django:
-To install all dependencies in this project, open your terminal and run:
+To install all dependencies in this project and to run locally , open your terminal and run:
 ```
 pip install -r requirements.txt
+
+Pipenv install 
+Pipenv shell
+Python manage.py runserver 
 ```
 
 #components:
