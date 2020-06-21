@@ -38,6 +38,7 @@ exports.createUser = async (req,res,next) => {
                 data: {message: 'email already registered!'}
             })
         }
+        // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
         let user_id = generateId(5);
         let token = generateToken(15);
