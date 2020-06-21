@@ -24,6 +24,7 @@
   },
   "homepage": "https://github.com/lollykrown/Team-fierce-mailing-API#readme",
   "dependencies": {
+    "bcryptjs": "^2.4.3",
     "body-parser": "^1.19.0",
     "debug": "^4.1.1",
     "dotenv": "^8.2.0",

@@ -1,6 +1,7 @@
 const {createAccount} = require('../utils/create_user');
 const {validateEmail} = require('../utils/mail_validator');
 const {generateId, generateToken} = require('../utils/generate_string');
+const bcryptjs = require('bcryptjs');
  
 //const {getConnection} = require('../utils/db_connector');
 //const connection = getConnection();
@@ -10,12 +11,12 @@ const DB = new Database();
 //const debug = require('debug')('app:userController');
  
 exports.createUser = async (req,res,next) => {
-    const {name, email, organisation} = req.body;
-    if (!name || !email || !organisation) {
+    const {name, email, password, organisation} = req.body;
+    if (!name || !email || !password || !organisation) {
         res.status(400).send({
           status: 'failed',
           data: {message:
-             'Add name, email and organisation in json format. This ia an example -> {"name":"olawale micheal juwon", "email": "olawalejuwon@gmail.com", "organisation":"HNG"}'}
+             'Add name, email, password and organisation in json format. This ia an example -> {"name":"olawale micheal juwon", "email": "olawalejuwon@gmail.com", "password": "your_password", "organisation":"HNG"}'}
         })
         return
       }
@@ -42,7 +43,8 @@ exports.createUser = async (req,res,next) => {
 
         let user_id = generateId(5);
         let token = generateToken(15);
-        if(createAccount(email,name,organisation,user_id,token)){
+        hashedPassword = await bcryptjs.hash(password, 12); // create a 12 character hash of the inputed password
+        if(createAccount(email,hashedPassword,name,organisation,user_id,token)){
             res.status(201).send({
                 status: 'success',
                 data: {message: 'account created! Request Body Extracted',
@@ -107,4 +109,55 @@ exports.configureUser = (req, res, next) => {
     //////////////
     
         
+}
+
+exports.loginUser = async (req, res, next) => {
+    const {email, password} = req.body;
+    if ( !email || !password ) {
+        return res.status(400).send({
+            status: 'failed',
+            data: {message:
+               'Add email and password in json format. This ia an example -> {"email": "olawalejuwon@gmail.com", "password": "your_password"}'}
+        })
+    }
+
+    let sql = " SELECT * FROM users WHERE `email` = ? ";
+
+    try {
+        let rows = await DB.query(sql, [email]);
+        if ( rows.length > 0 ) {
+            let valid = await bcryptjs.compare(password, rows[0].password);
+            if ( valid ) {
+                return res.status(200).send({
+                    status: 'success',
+                    data: {
+                        message: "Login successful",
+                        email: rows[0].email,
+                        name: rows[0].name,
+                        organisation: rows[0].organisation,
+                        account_id: rows[0].account_id,
+                        token: rows[0].token,
+                        protocol: rows[0].protocol
+                    }
+                })
+            } else {
+                return res.status(403).send({
+                    status: 'failed',
+                    data: {
+                        message: "Incorrect username or password, please review details and try again"
+                    }
+                })
+            }
+        } else {
+            return res.status(400).send({
+                status: 'failed',
+                data: {
+                    message: 'Incorrect username or password, please review details and try again'
+                }
+            })
+        }
+    } catch (err) {
+        console.log(err)
+    }
+    
 }
