@@ -9,7 +9,7 @@ const DB = new Database();
 
 //const debug = require('debug')('app:userController');
  
-exports.createUser = (req,res,next) => {
+exports.createUser = async (req,res,next) => {
     const {name, email, organisation} = req.body;
     if (!name || !email || !organisation) {
         res.status(400).send({
@@ -27,8 +27,18 @@ exports.createUser = (req,res,next) => {
             data: {message: 'Invalid email!'}
           })
           return
-        }     
+        }
         
+        // CHECK IF EMAIL IS ALREADY REGISTERED
+        let query = " SELECT email FROM users WHERE `email` = ? ";
+        let queryemail = await DB.query( query, [email] )
+        if ( queryemail.length > 0 ) {
+            return res.status(400).send({
+                status: 'failed',
+                data: {message: 'email already registered!'}
+            })
+        }
+
         let user_id = generateId(5);
         let token = generateToken(15);
         if(createAccount(email,name,organisation,user_id,token)){
